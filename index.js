@@ -8,7 +8,8 @@ ButtonBuilder,
 ButtonStyle,
 EmbedBuilder,
 ChannelType,
-PermissionsBitField
+PermissionsBitField,
+MessageFlags
 } = require("discord.js");
 
 const Groq = require("groq-sdk");
@@ -88,7 +89,7 @@ if(!member.roles.cache.has(PREMIUM_ROLE)){
 
 return interaction.reply({
 content:"❌ Hanya user **Premium** yang bisa membuat tiket AI.",
-ephemeral:true
+flags: MessageFlags.Ephemeral
 })
 
 }
@@ -97,7 +98,7 @@ if(userChannels.has(interaction.user.id)){
 
 return interaction.reply({
 content:`Kamu sudah punya channel AI: <#${userChannels.get(interaction.user.id)}>`,
-ephemeral:true
+flags: MessageFlags.Ephemeral
 })
 
 }
@@ -171,7 +172,7 @@ components:[row]
 
 interaction.reply({
 content:`Channel AI berhasil dibuat: ${newChannel}`,
-ephemeral:true
+flags: MessageFlags.Ephemeral
 })
 
 }
@@ -182,7 +183,7 @@ if(interaction.customId === "akhiri_chat_ai"){
 
 await interaction.reply({
 content:"Menyimpan log chat...",
-ephemeral:true
+flags: MessageFlags.Ephemeral
 })
 
 try{
@@ -199,10 +200,8 @@ transcript += `Tanggal : ${new Date().toLocaleString()}\n`
 transcript += `\n---------------------------------------\n\n`
 
 sorted.forEach(msg=>{
-
 const name = msg.author.bot ? "AI" : msg.author.username
 transcript += `[${name}] ${msg.content}\n\n`
-
 })
 
 const fileName = `ai-chat-${interaction.user.username}.txt`
@@ -227,9 +226,7 @@ files:[fileName]
 }
 
 }catch(err){
-
 console.log("LOG CHANNEL ERROR:",err)
-
 }
 
 }
@@ -258,7 +255,6 @@ client.on("guildMemberUpdate", async (oldMember, newMember) => {
 if(oldMember.roles.cache.has(PREMIUM_ROLE) && !newMember.roles.cache.has(PREMIUM_ROLE)){
 
 const channelId = userChannels.get(newMember.id)
-
 if(!channelId) return
 
 const channel = newMember.guild.channels.cache.get(channelId)
@@ -286,18 +282,12 @@ client.on("messageCreate", async (message) => {
 if(message.author.bot) return
 if(!message.channel.name.startsWith("ai-chat")) return
 
-/* ===== ANTI SPAM ===== */
-
 if(cooldown.has(message.author.id)){
 return message.reply("Tunggu sebentar sebelum bertanya lagi ⏳")
 }
 
 cooldown.set(message.author.id,true)
-setTimeout(()=>{
-cooldown.delete(message.author.id)
-},3000)
-
-/* ===== MEMORY CHAT ===== */
+setTimeout(()=>{ cooldown.delete(message.author.id) },3000)
 
 if(!memory.has(message.channel.id)){
 memory.set(message.channel.id,[
@@ -344,4 +334,3 @@ message.reply("AI sedang error, coba lagi.")
 })
 
 client.login(process.env.DISCORD_TOKEN);
-
