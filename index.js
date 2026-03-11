@@ -213,7 +213,9 @@ const logChannelId = process.env.LOG_CHANNEL
 
 if(logChannelId){
 
-const logChannel = interaction.guild.channels.cache.get(logChannelId)
+try{
+
+const logChannel = await interaction.guild.channels.fetch(logChannelId)
 
 if(logChannel){
 
@@ -221,6 +223,12 @@ await logChannel.send({
 content:`📄 Transcript chat AI dari ${interaction.user.tag}`,
 files:[fileName]
 })
+
+}
+
+}catch(err){
+
+console.log("LOG CHANNEL ERROR:",err)
 
 }
 
@@ -336,3 +344,4 @@ message.reply("AI sedang error, coba lagi.")
 })
 
 client.login(process.env.DISCORD_TOKEN);
+
