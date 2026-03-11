@@ -86,21 +86,17 @@ if(interaction.customId === "buat_chat_ai"){
 const member = await interaction.guild.members.fetch(interaction.user.id)
 
 if(!member.roles.cache.has(PREMIUM_ROLE)){
-
 return interaction.reply({
 content:"❌ Hanya user **Premium** yang bisa membuat tiket AI.",
 flags: MessageFlags.Ephemeral
 })
-
 }
 
 if(userChannels.has(interaction.user.id)){
-
 return interaction.reply({
 content:`Kamu sudah punya channel AI: <#${userChannels.get(interaction.user.id)}>`,
 flags: MessageFlags.Ephemeral
 })
-
 }
 
 const parent = interaction.channel.parent
@@ -126,8 +122,6 @@ PermissionsBitField.Flags.ReadMessageHistory
 }
 ]
 })
-
-/* ADMIN / DEV / OWNER bisa lihat semua tiket */
 
 if(ADMIN_ROLE){
 newChannel.permissionOverwrites.create(ADMIN_ROLE,{
@@ -186,56 +180,7 @@ content:"Menyimpan log chat...",
 flags: MessageFlags.Ephemeral
 })
 
-try{
-
-const messages = await interaction.channel.messages.fetch({ limit:100 })
-
-const sorted = Array.from(messages.values()).sort((a,b)=>a.createdTimestamp-b.createdTimestamp)
-
-let transcript = `AI CHAT TRANSCRIPT\n`
-transcript += `Server : ${interaction.guild.name}\n`
-transcript += `Channel : ${interaction.channel.name}\n`
-transcript += `User : ${interaction.user.tag}\n`
-transcript += `Tanggal : ${new Date().toLocaleString()}\n`
-transcript += `\n---------------------------------------\n\n`
-
-sorted.forEach(msg=>{
-const name = msg.author.bot ? "AI" : msg.author.username
-transcript += `[${name}] ${msg.content}\n\n`
-})
-
-const fileName = `ai-chat-${interaction.user.username}.txt`
-
-fs.writeFileSync(fileName, transcript)
-
-const logChannelId = process.env.LOG_CHANNEL
-
-if(logChannelId){
-
-try{
-
-const logChannel = await interaction.guild.channels.fetch(logChannelId)
-
-if(logChannel){
-
-await logChannel.send({
-content:`📄 Transcript chat AI dari ${interaction.user.tag}`,
-files:[fileName]
-})
-
-}
-
-}catch(err){
-console.log("LOG CHANNEL ERROR:",err)
-}
-
-}
-
-fs.unlinkSync(fileName)
-
-}catch(err){
-console.log(err)
-}
+await sendTranscript(interaction.channel, interaction.user.tag)
 
 userChannels.delete(interaction.user.id)
 memory.delete(interaction.channel.id)
@@ -261,7 +206,9 @@ const channel = newMember.guild.channels.cache.get(channelId)
 
 if(channel){
 
-channel.send("❌ Role Premium kamu sudah tidak ada. Tiket otomatis ditutup.")
+await channel.send("❌ Role Premium kamu sudah tidak ada. Tiket otomatis ditutup.")
+
+await sendTranscript(channel, newMember.user.tag)
 
 setTimeout(()=>{
 channel.delete().catch(()=>{})
@@ -274,6 +221,63 @@ userChannels.delete(newMember.id)
 }
 
 })
+
+/* ================= FUNGSI TRANSCRIPT ================= */
+
+async function sendTranscript(channel, userTag){
+
+try{
+
+const messages = await channel.messages.fetch({ limit:100 })
+
+const sorted = Array.from(messages.values()).sort((a,b)=>a.createdTimestamp-b.createdTimestamp)
+
+let transcript = `AI CHAT TRANSCRIPT\n`
+transcript += `Server : ${channel.guild.name}\n`
+transcript += `Channel : ${channel.name}\n`
+transcript += `User : ${userTag}\n`
+transcript += `Tanggal : ${new Date().toLocaleString()}\n`
+transcript += `\n---------------------------------------\n\n`
+
+sorted.forEach(msg=>{
+const name = msg.author.bot ? "AI" : msg.author.username
+transcript += `[${name}] ${msg.content}\n\n`
+})
+
+const fileName = `ai-chat-${Date.now()}.txt`
+
+fs.writeFileSync(fileName, transcript)
+
+const logChannelId = process.env.LOG_CHANNEL
+
+if(logChannelId){
+
+try{
+
+const logChannel = await channel.guild.channels.fetch(logChannelId)
+
+if(logChannel){
+
+await logChannel.send({
+content:`📄 Transcript chat AI dari ${userTag}`,
+files:[fileName]
+})
+
+}
+
+}catch(err){
+console.log("LOG CHANNEL ERROR:",err)
+}
+
+}
+
+fs.unlinkSync(fileName)
+
+}catch(err){
+console.log(err)
+}
+
+}
 
 /* ================= AI CHAT ================= */
 
