@@ -18,7 +18,8 @@ const client = new Client({
 intents:[
 GatewayIntentBits.Guilds,
 GatewayIntentBits.GuildMessages,
-GatewayIntentBits.MessageContent
+GatewayIntentBits.MessageContent,
+GatewayIntentBits.GuildMembers
 ]
 });
 
@@ -26,7 +27,14 @@ const groq = new Groq({
 apiKey: process.env.GROQ_API_KEY
 });
 
-/* ================= DATABASE SEDERHANA ================= */
+/* ================= CONFIG ROLE ================= */
+
+const PREMIUM_ROLE = process.env.PREMIUM_ROLE
+const ADMIN_ROLE = process.env.ADMIN_ROLE
+const DEV_ROLE = process.env.DEV_ROLE
+const OWNER_ID = process.env.OWNER_ID
+
+/* ================= DATABASE ================= */
 
 const memory = new Map()
 const cooldown = new Map()
@@ -74,6 +82,17 @@ if(!interaction.isButton()) return
 
 if(interaction.customId === "buat_chat_ai"){
 
+const member = await interaction.guild.members.fetch(interaction.user.id)
+
+if(!member.roles.cache.has(PREMIUM_ROLE)){
+
+return interaction.reply({
+content:"❌ Hanya user **Premium** yang bisa membuat tiket AI.",
+ephemeral:true
+})
+
+}
+
 if(userChannels.has(interaction.user.id)){
 
 return interaction.reply({
@@ -106,6 +125,29 @@ PermissionsBitField.Flags.ReadMessageHistory
 }
 ]
 })
+
+/* ADMIN / DEV / OWNER bisa lihat semua tiket */
+
+if(ADMIN_ROLE){
+newChannel.permissionOverwrites.create(ADMIN_ROLE,{
+ViewChannel:true,
+SendMessages:true
+})
+}
+
+if(DEV_ROLE){
+newChannel.permissionOverwrites.create(DEV_ROLE,{
+ViewChannel:true,
+SendMessages:true
+})
+}
+
+if(OWNER_ID){
+newChannel.permissionOverwrites.create(OWNER_ID,{
+ViewChannel:true,
+SendMessages:true
+})
+}
 
 userChannels.set(interaction.user.id,newChannel.id)
 
@@ -187,9 +229,7 @@ files:[fileName]
 fs.unlinkSync(fileName)
 
 }catch(err){
-
 console.log(err)
-
 }
 
 userChannels.delete(interaction.user.id)
@@ -198,6 +238,34 @@ memory.delete(interaction.channel.id)
 setTimeout(()=>{
 interaction.channel.delete().catch(()=>{})
 },2000)
+
+}
+
+})
+
+/* ================= AUTO CLOSE JIKA PREMIUM HILANG ================= */
+
+client.on("guildMemberUpdate", async (oldMember, newMember) => {
+
+if(oldMember.roles.cache.has(PREMIUM_ROLE) && !newMember.roles.cache.has(PREMIUM_ROLE)){
+
+const channelId = userChannels.get(newMember.id)
+
+if(!channelId) return
+
+const channel = newMember.guild.channels.cache.get(channelId)
+
+if(channel){
+
+channel.send("❌ Role Premium kamu sudah tidak ada. Tiket otomatis ditutup.")
+
+setTimeout(()=>{
+channel.delete().catch(()=>{})
+},5000)
+
+}
+
+userChannels.delete(newMember.id)
 
 }
 
@@ -213,9 +281,7 @@ if(!message.channel.name.startsWith("ai-chat")) return
 /* ===== ANTI SPAM ===== */
 
 if(cooldown.has(message.author.id)){
-
 return message.reply("Tunggu sebentar sebelum bertanya lagi ⏳")
-
 }
 
 cooldown.set(message.author.id,true)
@@ -226,11 +292,9 @@ cooldown.delete(message.author.id)
 /* ===== MEMORY CHAT ===== */
 
 if(!memory.has(message.channel.id)){
-
 memory.set(message.channel.id,[
 { role:"system", content:"Kamu adalah AI assistant yang ramah dan membantu." }
 ])
-
 }
 
 const chatMemory = memory.get(message.channel.id)
